@@ -116,8 +116,10 @@ soln.u = build_control(vOpt);
       [tout, yout] = odevr7(backwardRHS_NoXU, [TF, T0], backwardInitCond, ...
                                RelTol, AbsTol);
                             
-      dHduIntFunc = vectorInterpolant(flip(tout'), flip(yout(:, nSTATES+1:nSTATES+nCONTROLS)'), 'pchip');
-      dHduSawIntFunc = vectorInterpolant(flip(tout'), flip(yout(:, nSTATES+nCONTROLS+1:end)'), 'pchip');
+      dHduIntFunc = vectorInterpolant(flip(tout', 2), ...
+                           flip(yout(:, nSTATES+1:nSTATES+nCONTROLS)', 2), 'pchip');
+      dHduSawIntFunc = vectorInterpolant(flip(tout', 2), ...
+                           flip(yout(:, nSTATES+nCONTROLS+1:end)', 2), 'pchip');
       
       dHduInt = dHduIntFunc(controlPtArray);
       dHduSawInt = dHduSawIntFunc(controlPtArray);

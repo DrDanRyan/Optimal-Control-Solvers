@@ -17,5 +17,5 @@ x = vectorInterpolant(tout', xAugout(:, 1:nStates)', 'pchip');
 
 backwardRHS = @(t, lam) prob.adjointRHS(t, x(t), lam, u(t));
 [tout, lamout] = odevr7(backwardRHS, [TF, T0], lam0, RelTol, AbsTol);
-lam = vectorInterpolant(flip(tout'), flip(lamout'), 'pchip');
+lam = vectorInterpolant(flip(tout', 2), flip(lamout', 2), 'pchip');
 end

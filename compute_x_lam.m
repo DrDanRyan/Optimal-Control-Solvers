@@ -10,8 +10,8 @@ x = vectorInterpolant(tout', xout', 'pchip');
 
 backwardRHS = @(t, lam) prob.adjointRHS(t, x(t), lam, u(t));
 [tPts, lamPts] = odevr7(backwardRHS, [TF, T0], lam0, RelTol, AbsTol);
-tPts = flip(tPts');
-lamPts = flip(lamPts');
+tPts = flip(tPts', 2);
+lamPts = flip(lamPts', 2);
 uPts = prob.ControlChar(tPts, x(tPts), lamPts);
 
 lam = vectorInterpolant(tPts, lamPts, 'pchip');
