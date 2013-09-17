@@ -48,7 +48,7 @@ prob.ControlBounds = [umin umax]; % lower bound in 1st column, upper bound in 2n
    function J = optJac(t, y)
       J = zeros(2*nSTATES, 2*nSTATES);
       x = y(1:nSTATES); lam = y(nSTATES+1:end); u = ControlChar(t, x, lam);
-      if (u == 0) || (u==umax)
+      if (u == umin) || (u==umax)
          % Define any relevant partial derivatives of u as zero here
       else
          % Define any relevant partial derivatives of u according to the 
