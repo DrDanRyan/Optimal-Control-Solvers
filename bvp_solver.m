@@ -12,11 +12,11 @@ TF = tspan(end);
 nSTATES = length(x0); % this is revised below in the case of user-supplied boundary conditions
 
 % Assign default values to optional arguments
-bvpRelTol = 1e-7;
-bvpAbsTol = 1e-7;
-RelTol = 5e-14;
-AbsTol = 5e-14;
-MAX_MESH_SIZE = 50000;
+bvpRelTol = 1e-6;
+bvpAbsTol = 1e-6;
+RelTol = 1e-8;
+AbsTol = 1e-8;
+MAX_MESH_SIZE = 1000;
 nINTERP_PTS = 1001; 
 Solver = @bvp5c;
 InitMesh = linspace(T0, TF, 11);
