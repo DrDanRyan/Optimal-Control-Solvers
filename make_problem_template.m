@@ -1,9 +1,5 @@
 function prob = make_problem_template()
 
-% Define the number of state components (used to compute optRHS in terms of
-% stateRHS and adjointRHS.
-nSTATES = ;
-
 % Define global parameters here (including control bounds is a good idea)
 % Include anything here that you want to be able to change at runtime
 global umin umax ANY_ADDITIONAL_PARAMETERS;
@@ -46,6 +42,7 @@ prob.ControlBounds = [umin umax]; % lower bound in 1st column, upper bound in 2n
    end
 
    function J = optJac(t, y)
+      nSTATES = size(y, 1)/2;
       J = zeros(2*nSTATES, 2*nSTATES);
       x = y(1:nSTATES); lam = y(nSTATES+1:end); u = ControlChar(t, x, lam);
       if (u == umin) || (u==umax)
