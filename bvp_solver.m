@@ -102,12 +102,8 @@ interpPts = linspace(T0, TF, nINTERP_PTS);
 % Main Program
 % --------------------------------------------------------------------------------
 
-
-
-% Define optimality system
-   function value = optRHS(t, y)
-      x = y(1:end/2, :); 
-      lam = y(end/2+1:end, :); 
+   function value = optSys(t, y)
+      x = y(1:nSTATES,:); lam = y(nSTATES+1:end, :);
       u = prob.ControlChar(t, x, lam);
       value = [prob.stateRHS(t, x, u); prob.adjointRHS(t, x, lam, u)];
    end
@@ -121,7 +117,7 @@ if isfield(prob, 'optJac')
 end
 
 % Solve the BVP problem
-y = Solver(@optRHS, bcFunc, y0, bvpOptions);
+y = Solver(@optSys, bcFunc, y0, bvpOptions);
 
 % Make a optimal control function using interpolation (so that the control
 % does not directly depend on any global parameters).
