@@ -5,8 +5,10 @@ function soln = rk4_single_shooting(prob, x0, tspan, varargin)
 % -----------------------------------
 nSTATES = length(x0);
 nSTEPS = length(tspan) - 1;
+STATE_SHAPE = [nSTATES, nSTEPS+1];
 h = tspan(2) - tspan(1); %TODO raise exception if ~all(diff(tspan) == 0)
 nCONTROLS = size(prob.ControlBounds, 1);
+CONTROL_SHAPE = [nCONTROLS, nSTEPS+1];
 
 if isfield(prob, 'MinMax')
    MinMax = prob.MinMax;
@@ -77,7 +79,9 @@ soln.u = build_control(vOpt);
 % -----------------------------------
    
    function [J, dJdu] = nlpObjective(v)
-      
+      u = reshape(v, CONTROL_SHAPE);
+      [x, J] = compute_states(u, true);
+      [~, dJdu] = compute_adjoints_and_grad(x, u, true);    
    end
 
 
@@ -90,8 +94,70 @@ soln.u = build_control(vOpt);
 
 
    function control_func = build_control(v)
-      v = reshape(v(1:nCONTROLS*nCONTROL_PTS), nCONTROLS, []);
-      control_func = vectorInterpolant(controlPtArray, v, 'linear');
+      u = reshape(v, CONTROL_SHAPE);
+      control_func = vectorInterpolant(tspan, u, 'linear');
+   end
+
+
+   function midPts = compute_midpoints(vec)
+      midPts = .5*(vec(:,1:end-1) + vec(:,2:end));
+   end
+
+
+   function [x, J] = compute_states(u)
+      x = nan([STATE_SHAPE, 4]); % store x, xk1, xk2, and xk3 at each time pt
+      x(:,1,1) = x0;
+      J = 0;
+
+      tHalf = compute_midpoints(t);
+      uHalf = compute_midpoints(u);
+
+      for i = 1:nSteps
+         % Perform single RK-4 Step
+         % f1, f2, f3, f4 refer to the RK approx values of the state rhs
+         
+         f1 = prob.stateRHS(tspan(i), x(:,i,1), u(:,i));
+         x(:,i,2) = x(:,i,1) + .5*h*f1;
+
+         f2 = prob.stateRHS(tHalf(i), x(:,i,2), uHalf(:,i));
+         x(:,i,3) = x(:,i,1) + .5*h*f2;
+         
+         f3 = prob.stateRHS(tHalf(i), x(:,i,3), uHalf(:,i));
+         x(:,i,4) = x(:,i,1) + h*f3;
+         
+         f4 = prob.stateRHS(tspan(i+1), x(:,i,4), u(:,i+1));
+         
+         x(:,i+1,1) = x(:,i,1) + h*(f1 + 2*f2 + 2*f3 + f4)/6;         
+      end         
+      
+      % Compute objective if it is requested (vectorized)
+      if nargout > 1
+         g1 = prob.objective(tspan(1:end-1), x(:,1:end-1,1), u(:,1:end-1));
+         g2 = prob.objective(tHalf, x(:,1:end-1,2), uHalf);
+         g3 = prob.objective(tHalf, x(:,1:end-1,3), uHalf);
+         g4 = prob.objective(tspan(2:end), x(:,1:end-1,4), u(:,2:end));
+         J =  h*sum(g1 + 2*g2 + 2*g3 + g4)/6;
+      end
+   end
+
+
+   function [lam, dJdu] = compute_adjoints(x, u, isComputeGrad)
+      
+      % store lam, lamk1, lamk2 lamk3 at each time pt
+      lam = nan(STATE_SHAPE); 
+      lam(:,end) = 0;
+
+      tHalf = compute_midpoints(tspan);
+      uHalf = compute_midpoints(u);
+
+      for i = nSteps:-1:1
+         dk1dx = -prob.adjointRHS(t(i), x(:,i,1), u(:,i));
+         dk2dx = -prob.adjointRHS(tHalf(i), x(:,i,2), uHalf(i))*...
+                     (eye(nSTATES) + .5*h*dk1dx);
+         dk3dx = -prob.adjointRHS(tHalf(i), x(:,i,3), uHalf(i));
+         dk4dx = -prob.adjointRHS(t(i+1), x(:,i,4), u(:,i+1));
+         lam(:,i) = lam(:,i+1) + h*(dk1dx + 2*dk2dx + 2*dk3dx + dk4dx)/6;
+      end
    end
 
 
@@ -128,66 +194,6 @@ soln.u = build_control(vOpt);
       end
    end
 
-
-   function midPts = compute_midpoints(vec)
-      midPts = .5*(vec(:,1:end-1) + vec(:,2:end));
-   end
-
-
-   function [x, J, xK] = compute_states(u)
-      x = zeros(nStates, nSteps+1);
-      x(:,1) = x0;
-      xK = zeros(nStates, nSteps, 3);
-      cumObj = zeros(1, nSteps+1);
-
-      h = h;
-      tHalf = compute_midpoints(t);
-      uHalf = compute_midpoints(u);
-
-      for i = 1:nSteps
-         y1 = f(t(i), x(:,i), u(:,i));
-         xK(:,i,1) = x(:,i) + .5*h*y1;
-
-         y2 = f(tHalf(i), xK(:,i,1), uHalf(:,i));
-         xK(:,i,2) = x(:,i) + .5*h*y2;
-
-         y3 = f(tHalf(i), xK(:,i,2), uHalf(:,i));
-         xK(:,i,3) = x(:,i) + h*y3;
-
-         y4 = f(t(i+1), xK(:,i,3), u(:,i+1));
-
-         x(:,i+1) = x(:,i) + h*(y1 + 2*y2 + 2*y3 + y4)/6;
-
-         y1 = g(t(i), x(:,i), u(:,i));
-         y2 = g(tHalf(i), xK(:,i,1), uHalf(:,i));
-         y3 = g(tHalf(i), xK(:,i,2), uHalf(:,i));
-         y4 = g(t(i+1), xK(:,i,3), u(:,i+1));
-
-         cumObj(i+1) = cumObj(i) + h*(y1 + 2*y2 + 2*y3 + y4)/6;
-      end
-      J = cumObj(end);         
-   end
-
-
-   function lam = compute_adjoints(obj, x, xK, u)
-      lam = zeros(nStates, nSteps+1);
-      t = tspan;
-      h = h;
-      tHalf = compute_midpoints(t);
-      uHalf = compute_midpoints(u);
-
-      for i = nSteps:-1:1
-         y1 = dfdx(t(i), x(:,i), u(:,i));
-         y2 = dfdx(tHalf(i), xK(:,i,1), uHalf(:,i))*...
-            (eye(nStates) + .5*h*y1);  % TODO check if matrix order is correct in multiplication
-         y3 = dfdx(tHalf(i), xK(:,i,2), uHalf(:,i))*...
-            (eye(nStates) + .5*h*y2);
-         y4 = dfdx(t(i+1), xK(:,i,3), u(:,i+1))*...
-            (eye(nStates) + h*y3);
-
-
-      end
-   end
 
 end
 
