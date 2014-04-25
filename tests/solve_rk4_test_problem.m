@@ -2,7 +2,7 @@
 clear all
 global c m umax;
 T0 = 0;
-TF = 10;
+TF = 100;
 tspan = linspace(T0, TF, 101); 
 x0 = 1;
 c = 1.5;
