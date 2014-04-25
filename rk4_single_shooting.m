@@ -80,27 +80,8 @@ soln.u = build_control(vOpt);
    
    function [J, dJdu] = nlpObjective(v)
       u = reshape(v, CONTROL_SHAPE);
-      [x, J] = compute_states(u, true);
-      [~, dJdu] = compute_adjoints_and_grad(x, u, true);    
-   end
-
-
-   function [Lb, Ub] = build_optimization_bounds()
-      Lb = prob.ControlBounds(:,1)*ones(1, nCONTROL_PTS);
-      Ub = prob.ControlBounds(:,2)*ones(1, nCONTROL_PTS);
-      Lb = reshape(Lb, [], 1);
-      Ub = reshape(Ub, [], 1);
-   end
-
-
-   function control_func = build_control(v)
-      u = reshape(v, CONTROL_SHAPE);
-      control_func = vectorInterpolant(tspan, u, 'linear');
-   end
-
-
-   function midPts = compute_midpoints(vec)
-      midPts = .5*(vec(:,1:end-1) + vec(:,2:end));
+      [x, J] = compute_states(u);
+      [~, dJdu] = compute_adjoints(x, u);    
    end
 
 
@@ -117,10 +98,10 @@ soln.u = build_control(vOpt);
          % f1, f2, f3, f4 refer to the RK approx values of the state rhs
          
          f1 = prob.stateRHS(tspan(i), x(:,i,1), u(:,i));
-         x(:,i,2) = x(:,i,1) + .5*h*f1;
+         x(:,i,2) = x(:,i,1) + h/2*f1;
 
          f2 = prob.stateRHS(tHalf(i), x(:,i,2), uHalf(:,i));
-         x(:,i,3) = x(:,i,1) + .5*h*f2;
+         x(:,i,3) = x(:,i,1) + h/2*f2;
          
          f3 = prob.stateRHS(tHalf(i), x(:,i,3), uHalf(:,i));
          x(:,i,4) = x(:,i,1) + h*f3;
@@ -141,23 +122,85 @@ soln.u = build_control(vOpt);
    end
 
 
-   function [lam, dJdu] = compute_adjoints(x, u, isComputeGrad)
+   function [lam, dJdu] = compute_adjoints(x, u)
       
       % store lam, lamk1, lamk2 lamk3 at each time pt
-      lam = nan(STATE_SHAPE); 
+      lam = nan(STATE_SHAPE);      
       lam(:,end) = 0;
 
       tHalf = compute_midpoints(tspan);
       uHalf = compute_midpoints(u);
+      
+      dJdk = nan(nSTATES, nSTEPS, 4);
 
       for i = nSteps:-1:1
-         dk1dx = -prob.adjointRHS(t(i), x(:,i,1), u(:,i));
-         dk2dx = -prob.adjointRHS(tHalf(i), x(:,i,2), uHalf(i))*...
-                     (eye(nSTATES) + .5*h*dk1dx);
-         dk3dx = -prob.adjointRHS(tHalf(i), x(:,i,3), uHalf(i));
-         dk4dx = -prob.adjointRHS(t(i+1), x(:,i,4), u(:,i+1));
-         lam(:,i) = lam(:,i+1) + h*(dk1dx + 2*dk2dx + 2*dk3dx + dk4dx)/6;
+         dJdk(:,i,4) = h/6*lam(:,i+1);
+         dJdx3 = prob.dfdx_times_vec(t(i+1), x(:,i,4), u(:,i+1), ...
+                    dJdk(:,i,4)) + ...
+                    h/6*prob.dgdx(t(i+1), x(:,i,4), u(:,i+1));
+               
+         dJdk(:,i,3) = h/3*lam(:,i+1) + h*dJdx3;
+         dJdx2 = prob.dfdx_times_vec(tHalf(i), x(:,i,3), uHalf(:,i), ...
+                    dJdk(:,i,3)) + ...
+                    h/3*prob.dgdx(tHalf(i), x(:,i,3), uHalf(:,i));
+               
+         dJdk(:,i,2) = h/3*lam(:,i+1) + h/2*dJdx2;
+         dJdx1 = prob.dfdx_times_vec(tHalf(i), x(:,i,2), uHalf(:,i), ...
+                    dJdk(:,i,2)) + ...
+                    h/3*prob.dgdx(tHalf(i), x(:,i,2), uHalf(:,i));
+         
+         dJdk(:,i,1) = h/6*lam(:,i+1) + h/2*dJdx1;
+         
+         lam(:,i) = lam(:,i+1) + dJdx1 + dJdx2 + dJdx3 + ...
+            prob.dfdx_times_vec(t(i), x(:,i,1), u(:,i), dJdk(:,i,1)) + ...
+            h/6*prob.dgdx(t(i), x(:,i,1), u(:,i));
       end
+      
+      if nargout > 1 % Compute dJdu
+         dJdu = zeros(CONTROL_SHAPE);
+         
+         leftend = ...
+            prob.dfdu_times_vec(t(1:end-1), x(:,1:end-1,1), u(:,1:end-1), dJdk(:,:,1)) + ...
+            h/6*prob.dgdu(t(1:end-1), x(:,1:end-1,1), u(:,1:end-1));
+         
+         leftmid = ...
+            .5*prob.dfdu_times_vec(tHalf, x(:,1:end-1,2), uHalf, dJdk(:,:,2)) + ...
+            h/6*prob.dgdu(tHalf, x(:,1:end-1,2), uHalf);
+         
+         rightmid = ...
+            .5*prob.dfdu_times_vec(tHalf, x(:,1:end-1,3), uHalf, dJdk(:,:,3)) + ...
+            h/6*prob.dgdu(tHalf, x(:,1:end-1,3), uHalf);
+         
+         rightend = ...
+            prob.dfdu_times_vec(t(2:end), x(:,1:end-1,4), u(:,2:end), dJdk(:,:,4)) + ...
+            h/6*prob.dgdu(t(2:end), x(:,1:end-1,4), u(:,2:end));
+         
+         % Compute contributions from the right of u_j
+         dJdu(:,1:end-1) = leftend + leftmid + rightmid;
+         
+         % Compute contributions from the left of u_j
+         dJdu(:,2:end) = dJdu(:,2:end) + leftmid + rightmid + rightend;
+        
+      end
+   end
+
+
+   function [Lb, Ub] = build_optimization_bounds()
+      Lb = prob.ControlBounds(:,1)*ones(1, nCONTROL_PTS);
+      Ub = prob.ControlBounds(:,2)*ones(1, nCONTROL_PTS);
+      Lb = reshape(Lb, [], 1);
+      Ub = reshape(Ub, [], 1);
+   end
+
+
+   function control_func = build_control(v)
+      u = reshape(v, CONTROL_SHAPE);
+      control_func = vectorInterpolant(tspan, u, 'linear');
+   end
+
+
+   function midPts = compute_midpoints(vec)
+      midPts = .5*(vec(:,1:end-1) + vec(:,2:end));
    end
 
 

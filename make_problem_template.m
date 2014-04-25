@@ -6,8 +6,14 @@ global umin umax ANY_ADDITIONAL_PARAMETERS;
 
 % This block attaches the functions defined below as fields to the problem
 % structure. If some are not needed delete them here and below.
-prob.objective = @objective;
-prob.stateRHS = @stateRHS;
+prob.g = @g;
+prob.dgdx = @dgdx;
+prob.dgdu = @dgdu;
+
+prob.f = @f;
+prob.dfdx_times_vec = @dfdx_times_vec;
+prob.dfdu_times_vec = @dfdu_times_vec;
+
 prob.adjointRHS = @adjointRHS; 
 prob.dHdu = @dHdu;
 prob.ControlChar = @ControlChar; 
@@ -21,13 +27,32 @@ prob.ControlBounds = [umin umax]; % lower bound in 1st column, upper bound in 2n
 % All functions except optJac should be vectorized in the second component
 % for example:  t + x(1, :).*u(2, :) etc. to handle t = row-vector.
 
-   function value = objective(t, x, u)
+   function value = g(t, x, u)
       value = ;
    end
 
-   function value = stateRHS(t, x, u)
+   function value = dgdx(t, x, u)
       value = ;
    end
+
+   function value = dgdu(t, x, u)
+      value = ;
+   end
+
+   function value = f(t, x, u)
+      value = ;
+   end
+
+   function value = dfdx_times_vec(t, x, u, v)
+      value = ;
+   end
+
+   function value = dfdu_times_vec(t, x, u, v)
+      value = ;
+   end
+
+
+
 
    function value = adjointRHS(t, x, lam, u)
       value = ;
