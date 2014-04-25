@@ -10,6 +10,9 @@ h = tspan(2) - tspan(1); %TODO raise exception if ~all(diff(tspan) == 0)
 nCONTROLS = size(prob.ControlBounds, 1);
 CONTROL_SHAPE = [nCONTROLS, nSTEPS+1];
 
+T0 = tspan(1);
+TF = tspan(end);
+
 if isfield(prob, 'MinMax')
    MinMax = prob.MinMax;
 else
@@ -70,9 +73,13 @@ if strcmp(MinMax, 'Max')
   soln.J = -soln.J;
 end
 
-soln.u = build_control(vOpt);
-[soln.x, soln.lam] = compute_x_lam(prob, x0, [T0, TF], soln.u);
+uOpt = reshape(vOpt, CONTROL_SHAPE);
+xOpt = compute_states(uOpt);
+lamOpt = compute_adjoints(xOpt, uOpt);
 
+soln.u = vectorInterpolant(tspan, uOpt, 'linear');
+soln.x = vectorInterpolant(tspan, xOpt(:,:,1), 'pchip');
+soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
 
 % -----------------------------------
 % Auxillary functions
@@ -90,33 +97,33 @@ soln.u = build_control(vOpt);
       x(:,1,1) = x0;
       J = 0;
 
-      tHalf = compute_midpoints(t);
+      tHalf = compute_midpoints(tspan);
       uHalf = compute_midpoints(u);
 
-      for i = 1:nSteps
+      for i = 1:nSTEPS
          % Perform single RK-4 Step
          % f1, f2, f3, f4 refer to the RK approx values of the state rhs
          
-         f1 = prob.stateRHS(tspan(i), x(:,i,1), u(:,i));
+         f1 = prob.f(tspan(i), x(:,i,1), u(:,i));
          x(:,i,2) = x(:,i,1) + h/2*f1;
 
-         f2 = prob.stateRHS(tHalf(i), x(:,i,2), uHalf(:,i));
+         f2 = prob.f(tHalf(i), x(:,i,2), uHalf(:,i));
          x(:,i,3) = x(:,i,1) + h/2*f2;
          
-         f3 = prob.stateRHS(tHalf(i), x(:,i,3), uHalf(:,i));
+         f3 = prob.f(tHalf(i), x(:,i,3), uHalf(:,i));
          x(:,i,4) = x(:,i,1) + h*f3;
          
-         f4 = prob.stateRHS(tspan(i+1), x(:,i,4), u(:,i+1));
+         f4 = prob.f(tspan(i+1), x(:,i,4), u(:,i+1));
          
          x(:,i+1,1) = x(:,i,1) + h*(f1 + 2*f2 + 2*f3 + f4)/6;         
       end         
       
-      % Compute objective if it is requested (vectorized)
+      % Compute g if it is requested (vectorized)
       if nargout > 1
-         g1 = prob.objective(tspan(1:end-1), x(:,1:end-1,1), u(:,1:end-1));
-         g2 = prob.objective(tHalf, x(:,1:end-1,2), uHalf);
-         g3 = prob.objective(tHalf, x(:,1:end-1,3), uHalf);
-         g4 = prob.objective(tspan(2:end), x(:,1:end-1,4), u(:,2:end));
+         g1 = prob.g(tspan(1:end-1), x(:,1:end-1,1), u(:,1:end-1));
+         g2 = prob.g(tHalf, x(:,1:end-1,2), uHalf);
+         g3 = prob.g(tHalf, x(:,1:end-1,3), uHalf);
+         g4 = prob.g(tspan(2:end), x(:,1:end-1,4), u(:,2:end));
          J =  h*sum(g1 + 2*g2 + 2*g3 + g4)/6;
       end
    end
@@ -133,11 +140,11 @@ soln.u = build_control(vOpt);
       
       dJdk = nan(nSTATES, nSTEPS, 4);
 
-      for i = nSteps:-1:1
+      for i = nSTEPS:-1:1
          dJdk(:,i,4) = h/6*lam(:,i+1);
-         dJdx3 = prob.dfdx_times_vec(t(i+1), x(:,i,4), u(:,i+1), ...
+         dJdx3 = prob.dfdx_times_vec(tspan(i+1), x(:,i,4), u(:,i+1), ...
                     dJdk(:,i,4)) + ...
-                    h/6*prob.dgdx(t(i+1), x(:,i,4), u(:,i+1));
+                    h/6*prob.dgdx(tspan(i+1), x(:,i,4), u(:,i+1));
                
          dJdk(:,i,3) = h/3*lam(:,i+1) + h*dJdx3;
          dJdx2 = prob.dfdx_times_vec(tHalf(i), x(:,i,3), uHalf(:,i), ...
@@ -152,16 +159,16 @@ soln.u = build_control(vOpt);
          dJdk(:,i,1) = h/6*lam(:,i+1) + h/2*dJdx1;
          
          lam(:,i) = lam(:,i+1) + dJdx1 + dJdx2 + dJdx3 + ...
-            prob.dfdx_times_vec(t(i), x(:,i,1), u(:,i), dJdk(:,i,1)) + ...
-            h/6*prob.dgdx(t(i), x(:,i,1), u(:,i));
+            prob.dfdx_times_vec(tspan(i), x(:,i,1), u(:,i), dJdk(:,i,1)) + ...
+            h/6*prob.dgdx(tspan(i), x(:,i,1), u(:,i));
       end
       
       if nargout > 1 % Compute dJdu
          dJdu = zeros(CONTROL_SHAPE);
          
          leftend = ...
-            prob.dfdu_times_vec(t(1:end-1), x(:,1:end-1,1), u(:,1:end-1), dJdk(:,:,1)) + ...
-            h/6*prob.dgdu(t(1:end-1), x(:,1:end-1,1), u(:,1:end-1));
+            prob.dfdu_times_vec(tspan(1:end-1), x(:,1:end-1,1), u(:,1:end-1), dJdk(:,:,1)) + ...
+            h/6*prob.dgdu(tspan(1:end-1), x(:,1:end-1,1), u(:,1:end-1));
          
          leftmid = ...
             .5*prob.dfdu_times_vec(tHalf, x(:,1:end-1,2), uHalf, dJdk(:,:,2)) + ...
@@ -172,8 +179,8 @@ soln.u = build_control(vOpt);
             h/6*prob.dgdu(tHalf, x(:,1:end-1,3), uHalf);
          
          rightend = ...
-            prob.dfdu_times_vec(t(2:end), x(:,1:end-1,4), u(:,2:end), dJdk(:,:,4)) + ...
-            h/6*prob.dgdu(t(2:end), x(:,1:end-1,4), u(:,2:end));
+            prob.dfdu_times_vec(tspan(2:end), x(:,1:end-1,4), u(:,2:end), dJdk(:,:,4)) + ...
+            h/6*prob.dgdu(tspan(2:end), x(:,1:end-1,4), u(:,2:end));
          
          % Compute contributions from the right of u_j
          dJdu(:,1:end-1) = leftend + leftmid + rightmid;
@@ -186,16 +193,10 @@ soln.u = build_control(vOpt);
 
 
    function [Lb, Ub] = build_optimization_bounds()
-      Lb = prob.ControlBounds(:,1)*ones(1, nCONTROL_PTS);
-      Ub = prob.ControlBounds(:,2)*ones(1, nCONTROL_PTS);
+      Lb = prob.ControlBounds(:,1)*ones(1, nSTEPS+1);
+      Ub = prob.ControlBounds(:,2)*ones(1, nSTEPS+1);
       Lb = reshape(Lb, [], 1);
       Ub = reshape(Ub, [], 1);
-   end
-
-
-   function control_func = build_control(v)
-      u = reshape(v, CONTROL_SHAPE);
-      control_func = vectorInterpolant(tspan, u, 'linear');
    end
 
 
@@ -211,7 +212,7 @@ soln.u = build_control(vOpt);
       % without returning any information)
       
       stop = 0;
-      uValues = reshape(v(1:nCONTROLS*nCONTROL_PTS), nCONTROLS, []);
+      u = reshape(v, CONTROL_SHAPE);
       if strcmp(MinMax, 'Max')
          objValue = -optimValues.fval;
       else
@@ -224,14 +225,14 @@ soln.u = build_control(vOpt);
                title(sprintf('Objective Value: %1.6e', objValue))
                set(gca, 'XLim', [T0 TF], 'YLim', ...
                   [min(prob.ControlBounds(:,1)), max(prob.ControlBounds(:,2))]);
-               graphHandles = plot(controlPtArray, uValues);
+               graphHandles = plot(tspan, u);
                set(graphHandles, 'Tag', 'handlesTag');
             else
                graphHandles = findobj(get(gca,'Children'),'Tag','handlesTag');
                graphHandles = graphHandles(end:-1:1); %Handle order gets reversed using findobj
                title(sprintf('Objective Value: %1.6e', objValue));
                for idx = 1:nCONTROLS
-                  set(graphHandles(idx), 'YData', uValues(idx, :));
+                  set(graphHandles(idx), 'YData', u(idx, :));
                end
             end
       end
