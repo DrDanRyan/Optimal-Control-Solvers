@@ -145,6 +145,8 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
                                      dJdk(:,i,2));
                                   
          dJdk(:,i,1) = h/6*lam(:,i+1) + h/2*dJdx1;
+         lam(:,i) = lam(:,i+1) + dJdx1 + dJdx2 + dJdx3 + ...
+                   prob.dFdx_times_vec(tspan(i), x(:,i,1), u(:,i), dJdk(:,i,1));
       end  
       
       if nargout > 1 % Compute dJdu
