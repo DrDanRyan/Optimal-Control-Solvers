@@ -5,37 +5,27 @@ global c m umax;
 
 % This block attaches the functions defined below as fields to the problem
 % structure.
-prob.g = @g;
-prob.f = @f;
-prob.dgdx = @dgdx;
-prob.dgdu = @dgdu;
-prob.dfdx_times_vec = @dfdx_times_vec;
-prob.dfdu_times_vec = @dfdu_times_vec;
+prob.F = @F;
+prob.dFdx_times_vec = @dFdx_times_vec;
+prob.dFdu_times_vec = @dFdu_times_vec;
 prob.ControlBounds = [0 umax]; %lower bound in 1st column, upper bound in 2nd
                                %additional rows for more controls if needed
 
-   function value = g(t, x, u)
-      value = x.^2 + c*u.^2;
+
+   function value = F(t, y, u)
+      x = y(1,:);
+      value = [x.*(m - x) - u;
+               x.^2 + c*u.^2];
    end
 
-   function value = dgdx(t, x, u)
-      value = 2*x;
+   function value = dFdx_times_vec(t, y, u, v)
+      x = y(1,:);
+      value = [(m - 2*x).*v(1,:) + 2*x.*v(2,:); 
+               0];
    end
 
-   function value = dgdu(t, x, u)
-      value = 2*c*u;
-   end
-
-   function value = f(t, x, u)
-      value = x.*(m - x) - u;
-   end
-
-   function value = dfdx_times_vec(t, x, u, v)
-      value = (m - 2*x).*v;
-   end
-
-   function value = dfdu_times_vec(t, x, u, v)
-      value = -v;
+   function value = dFdu_times_vec(t, y, u, v)
+      value = -v(1,:) + 2*c*u.*v(2,:);
    end
 
 end
