@@ -12,4 +12,4 @@ prob = rk4_test_problem();  % all problem definitions are in the function make_t
 
 
 %% Solve the problem
-soln = rk4_single_shooting2(prob, x0, tspan)
+soln = rk4_single_shooting(prob, x0, tspan)

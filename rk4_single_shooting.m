@@ -95,45 +95,36 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
    function [x, J] = compute_states(u)
       x = nan([STATE_SHAPE, 4]); % store x, xk1, xk2, and xk3 at each time pt
       x(:,1,1) = x0;
-      J = 0;
 
       tHalf = compute_midpoints(tspan);
       uHalf = compute_midpoints(u);
 
       for i = 1:nSTEPS
          % Perform single RK-4 Step
-         % f1, f2, f3, f4 refer to the RK approx values of the state rhs
+         % F1, F2, F3, F4 refer to the RK approx values of the state rhs
          
-         f1 = prob.f(tspan(i), x(:,i,1), u(:,i));
-         x(:,i,2) = x(:,i,1) + h/2*f1;
+         F1 = prob.F(tspan(i), x(:,i,1), u(:,i));
+         x(:,i,2) = x(:,i,1) + h/2*F1;
 
-         f2 = prob.f(tHalf(i), x(:,i,2), uHalf(:,i));
-         x(:,i,3) = x(:,i,1) + h/2*f2;
+         F2 = prob.F(tHalf(i), x(:,i,2), uHalf(:,i));
+         x(:,i,3) = x(:,i,1) + h/2*F2;
          
-         f3 = prob.f(tHalf(i), x(:,i,3), uHalf(:,i));
-         x(:,i,4) = x(:,i,1) + h*f3;
+         F3 = prob.F(tHalf(i), x(:,i,3), uHalf(:,i));
+         x(:,i,4) = x(:,i,1) + h*F3;
          
-         f4 = prob.f(tspan(i+1), x(:,i,4), u(:,i+1));
+         F4 = prob.F(tspan(i+1), x(:,i,4), u(:,i+1));
          
-         x(:,i+1,1) = x(:,i,1) + h*(f1 + 2*f2 + 2*f3 + f4)/6;         
+         x(:,i+1,1) = x(:,i,1) + h/6*(F1 + 2*F2 + 2*F3 + F4);         
       end         
       
-      % Compute g if it is requested (vectorized)
-      if nargout > 1
-         g1 = prob.g(tspan(1:end-1), x(:,1:end-1,1), u(:,1:end-1));
-         g2 = prob.g(tHalf, x(:,1:end-1,2), uHalf);
-         g3 = prob.g(tHalf, x(:,1:end-1,3), uHalf);
-         g4 = prob.g(tspan(2:end), x(:,1:end-1,4), u(:,2:end));
-         J =  h*sum(g1 + 2*g2 + 2*g3 + g4)/6;
-      end
+      J = x(end,end,1);
    end
 
 
    function [lam, dJdu] = compute_adjoints(x, u)
       
-      % store lam, lamk1, lamk2 lamk3 at each time pt
-      lam = nan(STATE_SHAPE);      
-      lam(:,end) = 0;
+      lam = zeros(STATE_SHAPE);      
+      lam(end,end) = 1;
 
       tHalf = compute_midpoints(tspan);
       uHalf = compute_midpoints(u);
@@ -142,52 +133,42 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
 
       for i = nSTEPS:-1:1
          dJdk(:,i,4) = h/6*lam(:,i+1);
-         dJdx3 = prob.dfdx_times_vec(tspan(i+1), x(:,i,4), u(:,i+1), ...
-                    dJdk(:,i,4)) + ...
-                    h/6*prob.dgdx(tspan(i+1), x(:,i,4), u(:,i+1));
-               
+         dJdx3 = prob.dFdx_times_vec(tspan(i+1), x(:,i,4), u(:,i+1), ...
+                                     dJdk(:,i,4));
+                                  
          dJdk(:,i,3) = h/3*lam(:,i+1) + h*dJdx3;
-         dJdx2 = prob.dfdx_times_vec(tHalf(i), x(:,i,3), uHalf(:,i), ...
-                    dJdk(:,i,3)) + ...
-                    h/3*prob.dgdx(tHalf(i), x(:,i,3), uHalf(:,i));
-               
+         dJdx2 = prob.dFdx_times_vec(tHalf(i), x(:,i,3), uHalf(i), ...
+                                     dJdk(:,i,3));
+                                  
          dJdk(:,i,2) = h/3*lam(:,i+1) + h/2*dJdx2;
-         dJdx1 = prob.dfdx_times_vec(tHalf(i), x(:,i,2), uHalf(:,i), ...
-                    dJdk(:,i,2)) + ...
-                    h/3*prob.dgdx(tHalf(i), x(:,i,2), uHalf(:,i));
-         
+         dJdx1 = prob.dFdx_times_vec(tHalf(i), x(:,i,2), uHalf(i), ...
+                                     dJdk(:,i,2));
+                                  
          dJdk(:,i,1) = h/6*lam(:,i+1) + h/2*dJdx1;
-         
          lam(:,i) = lam(:,i+1) + dJdx1 + dJdx2 + dJdx3 + ...
-            prob.dfdx_times_vec(tspan(i), x(:,i,1), u(:,i), dJdk(:,i,1)) + ...
-            h/6*prob.dgdx(tspan(i), x(:,i,1), u(:,i));
-      end
+                   prob.dFdx_times_vec(tspan(i), x(:,i,1), u(:,i), dJdk(:,i,1));
+      end  
       
       if nargout > 1 % Compute dJdu
          dJdu = zeros(CONTROL_SHAPE);
          
-         leftend = ...
-            prob.dfdu_times_vec(tspan(1:end-1), x(:,1:end-1,1), u(:,1:end-1), dJdk(:,:,1)) + ...
-            h/6*prob.dgdu(tspan(1:end-1), x(:,1:end-1,1), u(:,1:end-1));
+         leftend = prob.dFdu_times_vec(tspan(1:end-1), x(:,1:end-1,1), ...
+                                       u(:,1:end-1), dJdk(:,:,1));
          
-         leftmid = ...
-            .5*prob.dfdu_times_vec(tHalf, x(:,1:end-1,2), uHalf, dJdk(:,:,2)) + ...
-            h/6*prob.dgdu(tHalf, x(:,1:end-1,2), uHalf);
-         
-         rightmid = ...
-            .5*prob.dfdu_times_vec(tHalf, x(:,1:end-1,3), uHalf, dJdk(:,:,3)) + ...
-            h/6*prob.dgdu(tHalf, x(:,1:end-1,3), uHalf);
-         
-         rightend = ...
-            prob.dfdu_times_vec(tspan(2:end), x(:,1:end-1,4), u(:,2:end), dJdk(:,:,4)) + ...
-            h/6*prob.dgdu(tspan(2:end), x(:,1:end-1,4), u(:,2:end));
+         leftmid = .5*prob.dFdu_times_vec(tHalf, x(:,1:end-1,2), ...
+                                       uHalf, dJdk(:,:,2));
+            
+         rightmid = .5*prob.dFdu_times_vec(tHalf, x(:,1:end-1,3), ...
+                                       uHalf, dJdk(:,:,3));
+                                    
+         rightend = prob.dFdu_times_vec(tspan(2:end), x(:,1:end-1,4), ...
+                                       u(:,2:end), dJdk(:,:,4));
          
          % Compute contributions from the right of u_j
          dJdu(:,1:end-1) = leftend + leftmid + rightmid;
          
          % Compute contributions from the left of u_j
          dJdu(:,2:end) = dJdu(:,2:end) + leftmid + rightmid + rightend;
-        
       end
    end
 
