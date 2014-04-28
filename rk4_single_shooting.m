@@ -137,11 +137,11 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
                                      dJdk(:,i,4));
                                   
          dJdk(:,i,3) = h/3*lam(:,i+1) + h*dJdx3;
-         dJdx2 = prob.dFdx_times_vec(tHalf(i), x(:,i,3), uHalf(i), ...
+         dJdx2 = prob.dFdx_times_vec(tHalf(i), x(:,i,3), uHalf(:,i), ...
                                      dJdk(:,i,3));
                                   
          dJdk(:,i,2) = h/3*lam(:,i+1) + h/2*dJdx2;
-         dJdx1 = prob.dFdx_times_vec(tHalf(i), x(:,i,2), uHalf(i), ...
+         dJdx1 = prob.dFdx_times_vec(tHalf(i), x(:,i,2), uHalf(:,i), ...
                                      dJdk(:,i,2));
                                   
          dJdk(:,i,1) = h/6*lam(:,i+1) + h/2*dJdx1;
