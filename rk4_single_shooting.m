@@ -197,6 +197,8 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
          else
             dJdu(:,1:2:end) = squeeze(sum(reshape(intervalLoss, nCONTROLS, 2*uStride, []), 2));
          end
+         
+         dJdu = reshape(dJdu, [], 1);
       end
    end
 
