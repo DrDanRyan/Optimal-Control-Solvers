@@ -17,7 +17,6 @@ TF = tspan(end);
 
 nCONTROLS = size(prob.ControlBounds, 1);
 CONTROL_SHAPE = [nCONTROLS, nCONTROL_PTS];
-vSize = nCONTROLS*nCONTROL_PTS;
 
 if isfield(prob, 'MinMax')
    MinMax = prob.MinMax;
@@ -44,9 +43,9 @@ ControlType = p.Results.ControlType;
 
 switch ControlType
    case 'linear'
-      controlObj = LinearControl(nCONTROL_PTS, [T0, TF], prob.ControlBounds);
+      controlObj = PWLinearControl(t, nCONTROL_PTS, nCONTROLS);
    case 'Chebyshev'
-      controlObj = ChebyshevControl(nCONTROL_PTS, [T0, TF], prob.ControlBounds);
+      controlObj = ChebyshevControl(t, nCONTROL_PTS, nCONTROLS);
 end
 
 if p.Results.Reporting
@@ -72,9 +71,20 @@ nlpOptions = optimoptions(@fmincon, 'Algorithm', Algorithm, ...
 % Main execution
 % -----------------------------------
 
-v0 = controlObj.compute_initial_v(vSize);
-nonlcon = controlObj.nonlcon;
-[Lb, Ub] = controlObj.controlBounds;
+v0 = controlObj.compute_initial_v(prob.ControlBounds);
+
+if ismethod(controlObj, 'compute_nlp_bounds')
+   [Lb, Ub] = controlObj.compute_nlp_bounds(prob.ControlBounds);
+else
+   Lb = [];
+   Ub = [];
+end
+
+if ismethod(controlObj, 'compute_nonlcon')
+   nonlcon = @controlObj.compute_nonlcon;
+else
+   nonlcon = [];
+end
 
 [vOpt, soln.J] = fmincon(@nlpObjective, v0, [], [], [], [], ...
                            Lb, Ub, nonlcon, nlpOptions);
@@ -116,7 +126,7 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
          F2 = prob.F(t(2*i), x(:,i,2), u(:,2*i));
          x(:,i,3) = x(:,i,1) + h(i)/2*F2;
          
-         F3 = prob.F(tHalf(i), x(:,i,3), u(:,2*i));
+         F3 = prob.F(t(2*i), x(:,i,3), u(:,2*i));
          x(:,i,4) = x(:,i,1) + h(i)*F3;
          
          F4 = prob.F(t(2*i+1), x(:,i,4), u(:,2*i+1));
@@ -168,20 +178,20 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
          % RK step interval mid points
          dJdu(:,2:2:end-1) = ...
             prob.dFdu_times_vec(t(2:2:end-1), x(:,1:end-1,2), ...
-                                u(2:2:end-1), dJdk(:,:,2)) ...
+                                u(:,2:2:end-1), dJdk(:,:,2)) ...
             + prob.dFdu_times_vec(t(2:2:end-1), x(:,1:end-1,3), ...
-                                  u(2:2:end-1), dJdk(:,:,3));
+                                  u(:,2:2:end-1), dJdk(:,:,3));
          
          % RK step interval endpts (except for left and right of full interval
          dJdu(:,3:2:end-2) = ...
             prob.dFdu_times_vec(t(3:2:end-2), x(:,2:end-1,1), ...
-                                u(3:2:end-2), dJdk(:,2:end,1)) ...
+                                u(:,3:2:end-2), dJdk(:,2:end,1)) ...
             + prob.dFdu_times_vec(t(3:2:end-2), x(:,1:end-2,4), ...
-                                  u(3:2:end-2), dJdk(:,1:end-1,4));
+                                  u(:,3:2:end-2), dJdk(:,1:end-1,4));
          
          % Right end point
          dJdu(:,end) = prob.dFdu_times_vec(t(end), x(:,end-1,4), ...
-                                           u(end), dJdk(:,end,4)); 
+                                           u(:,end), dJdk(:,end,4)); 
    end
 
 
@@ -192,7 +202,7 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
       % without returning any information)
       
       stop = 0;
-      u = reshape(v, CONTROL_SHAPE);
+      u = controlObj.compute_u(tspan, v);
       if strcmp(MinMax, 'Max')
          objValue = -optimValues.fval;
       else
@@ -205,7 +215,7 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
                title(sprintf('Objective Value: %1.6e', objValue))
                set(gca, 'XLim', [T0 TF], 'YLim', ...
                   [min(prob.ControlBounds(:,1)), max(prob.ControlBounds(:,2))]);
-               graphHandles = plot(uspan, u);
+               graphHandles = plot(tspan, u);
                set(graphHandles, 'Tag', 'handlesTag');
             else
                graphHandles = findobj(get(gca,'Children'),'Tag','handlesTag');
