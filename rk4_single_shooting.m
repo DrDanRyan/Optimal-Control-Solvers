@@ -17,6 +17,7 @@ TF = tspan(end);
 
 nCONTROLS = size(prob.ControlBounds, 1);
 CONTROL_SHAPE = [nCONTROLS, nCONTROL_PTS];
+vSize = nCONTROLS*nCONTROL_PTS;
 
 if isfield(prob, 'MinMax')
    MinMax = prob.MinMax;
@@ -71,7 +72,7 @@ nlpOptions = optimoptions(@fmincon, 'Algorithm', Algorithm, ...
 % Main execution
 % -----------------------------------
 
-v0 = controlObj.compute_initial_v();
+v0 = controlObj.compute_initial_v(vSize);
 nonlcon = controlObj.nonlcon;
 [Lb, Ub] = controlObj.controlBounds;
 
