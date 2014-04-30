@@ -30,7 +30,8 @@ p.addParamValue('TolFun', 1e-4);
 p.addParamValue('Algorithm', 'sqp');
 p.addParamValue('Reporting', true);
 p.addParamValue('DerivativeCheck', 'off');
-p.addParamValue('ControlParameterization', 'linear');
+p.addParamValue('ControlType', 'linear', ...
+                  @(x) any(strcmp(x, {'linear', 'Chebyshev'})));
 parse(p, varargin{:});
 
 % Turn control values into column vector for fmincon
@@ -38,7 +39,14 @@ TolX = p.Results.TolX;
 TolFun = p.Results.TolFun;
 Algorithm = p.Results.Algorithm;
 DerivativeCheck = p.Results.DerivativeCheck;
-ControlParameterization = p.Results.ControlParameterization;
+ControlType = p.Results.ControlType;
+
+switch ControlType
+   case 'linear'
+      controlObj = LinearControl(nCONTROL_PTS, [T0, TF], prob.ControlBounds);
+   case 'Chebyshev'
+      controlObj = ChebyshevControl(nCONTROL_PTS, [T0, TF], prob.ControlBounds);
+end
 
 if p.Results.Reporting
    plotfun = @plot_func;
@@ -63,12 +71,10 @@ nlpOptions = optimoptions(@fmincon, 'Algorithm', Algorithm, ...
 % Main execution
 % -----------------------------------
 
-% These all vary with different ControlParameterization schemes
-v0 = compute_initial_control_vector();
-dudv = compute_dudv(); 
-nonlcon = make_constraint_function();
+v0 = controlObj.compute_initial_v();
+nonlcon = controlObj.nonlcon;
+[Lb, Ub] = controlObj.controlBounds;
 
-[Lb, Ub] = build_optimization_bounds();
 [vOpt, soln.J] = fmincon(@nlpObjective, v0, [], [], [], [], ...
                            Lb, Ub, nonlcon, nlpOptions);
                         
@@ -76,11 +82,11 @@ if strcmp(MinMax, 'Max')
   soln.J = -soln.J;
 end
 
-uOpt = compute_control_values(vOpt);
+uOpt = controlObj.compute_u(t, vOpt);
 xOpt = compute_states(uOpt);
 lamOpt = compute_adjoints(xOpt, uOpt);
 
-soln.u = make_control_function(vOpt);
+soln.u = controlObj.compute_uFunc(vOpt);
 soln.x = vectorInterpolant(tspan, xOpt(:,:,1), 'pchip');
 soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
 
@@ -89,7 +95,7 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
 % -----------------------------------
    
    function [J, dJdv] = nlpObjective(v)
-      u = compute_control_values(v);
+      u = controlObj.compute_u(t, v);
       [x, J] = compute_states(u);
       [~, dJdv] = compute_adjoints(x, u);    
    end
@@ -147,8 +153,7 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
       
       if nargout > 1
          dJdu = compute_dJdu(x, u, dJdk);
-         dJdv = dJdu*dudv;         
-         dJdv = reshape(dJdv, [], 1);
+         dJdv = controlObj.compute_dJdv(dJdu);
       end
    end
 
@@ -176,43 +181,6 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
          % Right end point
          dJdu(:,end) = prob.dFdu_times_vec(t(end), x(:,end-1,4), ...
                                            u(end), dJdk(:,end,4)); 
-   end
-
-
-   function u = compute_control_values(v)
-      % u ~ nCONTROLS x 2*nSTEPS+1
-      uFunc = make_control_function(v);
-      u = uFunc(t);
-   end
-
-
-   function dudv = compute_dudv()
-      % dudv ~ nCONTROL_PTS x nSTEPS x 2
-   end
-
-
-   function uFunc = make_control_function(v)
-      
-   end
-
-
-   function nonlcon = make_constraint_function()
-      switch ControlParameterization
-         case 'Chebyshev'
-            % TODO fill this in
-         case 'linear'
-            nonlcon = [];
-         case 'constant'
-            nonlcon = [];
-      end
-   end
-   
-
-   function [Lb, Ub] = build_optimization_bounds()
-      Lb = prob.ControlBounds(:,1)*ones(1, nCONTROL_PTS);
-      Ub = prob.ControlBounds(:,2)*ones(1, nCONTROL_PTS);
-      Lb = reshape(Lb, [], 1);
-      Ub = reshape(Ub, [], 1);
    end
 
 
