@@ -32,6 +32,7 @@ p.addParamValue('Reporting', true);
 p.addParamValue('DerivativeCheck', 'off');
 p.addParamValue('ControlType', 'linear', ...
                   @(x) any(strcmp(x, {'linear', 'Chebyshev'})));
+p.addParamValue('isInfiniteApprox', true);
 parse(p, varargin{:});
 
 % Turn control values into column vector for fmincon
@@ -40,6 +41,7 @@ TolFun = p.Results.TolFun;
 Algorithm = p.Results.Algorithm;
 DerivativeCheck = p.Results.DerivativeCheck;
 ControlType = p.Results.ControlType;
+isInfiniteApprox = p.Results.isInfiniteApprox;
 
 switch ControlType
    case 'linear'
@@ -56,6 +58,11 @@ else
    iter_detail = 'off';
 end
 
+% If approximating infinite time solution, canonical equilibrium and stable
+% eigenvectors. Then precompute Vlam*Vx^{-1} (see notes).
+if isInfiniteApprox
+   
+end
 
 % Build nlp options structures
 nlpOptions = optimoptions(@fmincon, 'Algorithm', Algorithm, ...
@@ -139,8 +146,13 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
 
 
    function [lam, dJdv] = compute_adjoints(x, u)
-      lam = zeros(STATE_SHAPE);      
-      lam(end,end) = 1;
+      
+      if isInfiniteApprox
+         
+      else
+         lam = zeros(STATE_SHAPE);      
+         lam(end,end) = 1;
+      end
       
       dJdk = nan(nSTATES, nSTEPS, 4);
 
