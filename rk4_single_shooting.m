@@ -45,9 +45,9 @@ isInfiniteApprox = p.Results.isInfiniteApprox;
 
 switch ControlType
    case 'linear'
-      controlObj = PWLinearControl(t, nCONTROL_PTS, nCONTROLS);
+      control = PWLinearControl(t, nCONTROL_PTS, nCONTROLS);
    case 'Chebyshev'
-      controlObj = ChebyshevControl(t, nCONTROL_PTS, nCONTROLS);
+      control = ChebyshevControl(t, nCONTROL_PTS, nCONTROLS);
 end
 
 if p.Results.Reporting
@@ -78,17 +78,17 @@ nlpOptions = optimoptions(@fmincon, 'Algorithm', Algorithm, ...
 % Main execution
 % -----------------------------------
 
-v0 = controlObj.compute_initial_v(prob.ControlBounds);
+v0 = control.compute_initial_v(prob.ControlBounds);
 
-if ismethod(controlObj, 'compute_nlp_bounds')
-   [Lb, Ub] = controlObj.compute_nlp_bounds(prob.ControlBounds);
+if ismethod(control, 'compute_nlp_bounds')
+   [Lb, Ub] = control.compute_nlp_bounds(prob.ControlBounds);
 else
    Lb = [];
    Ub = [];
 end
 
-if ismethod(controlObj, 'compute_nonlcon')
-   nonlcon = @controlObj.compute_nonlcon;
+if ismethod(control, 'compute_nonlcon')
+   nonlcon = @control.compute_nonlcon;
 else
    nonlcon = [];
 end
@@ -100,11 +100,11 @@ if strcmp(MinMax, 'Max')
   soln.J = -soln.J;
 end
 
-uOpt = controlObj.compute_u(t, vOpt);
+uOpt = control.compute_u(t, vOpt);
 xOpt = compute_states(uOpt);
 lamOpt = compute_adjoints(xOpt, uOpt);
 
-soln.u = controlObj.compute_uFunc(vOpt);
+soln.u = control.compute_uFunc(vOpt);
 soln.x = vectorInterpolant(tspan, xOpt(:,:,1), 'pchip');
 soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
 
@@ -113,7 +113,7 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
 % -----------------------------------
    
    function [J, dJdv] = nlpObjective(v)
-      u = controlObj.compute_u(t, v);
+      u = control.compute_u(t, v);
       [x, J] = compute_states(u);
       [~, dJdv] = compute_adjoints(x, u);    
    end
@@ -147,13 +147,9 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
 
    function [lam, dJdv] = compute_adjoints(x, u)
       
-      if isInfiniteApprox
-         
-      else
-         lam = zeros(STATE_SHAPE);      
-         lam(end,end) = 1;
-      end
-      
+      lam = zeros(STATE_SHAPE);      
+      lam(end,end) = 1;
+            
       dJdk = nan(nSTATES, nSTEPS, 4);
 
       for i = nSTEPS:-1:1
@@ -176,7 +172,7 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
       
       if nargout > 1
          dJdu = compute_dJdu(x, u, dJdk);
-         dJdv = controlObj.compute_dJdv(dJdu);
+         dJdv = control.compute_dJdv(dJdu);
       end
    end
 
@@ -214,7 +210,7 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
       % without returning any information)
       
       stop = 0;
-      u = controlObj.compute_u(tspan, v);
+      u = control.compute_u(tspan, v);
       if strcmp(MinMax, 'Max')
          objValue = -optimValues.fval;
       else
