@@ -11,7 +11,7 @@ classdef Integrator < handle
    
    methods (Abstract)
       [x, J] = compute_states(obj, prob, x0, u)
-      [lam, dJdu] = compute_adjoints(obj, prob)
+      [lam, dJdu] = compute_adjoints(obj, prob, u)
    end
    
 end

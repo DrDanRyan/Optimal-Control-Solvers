@@ -1,26 +1,24 @@
 classdef PWLinearControl < ControlType
 
    properties
-      tspan
       nControlPts
       nControls     
-      uspan
-      dudv
+      controlPts
+      
+      B  % basis functions evaluated at points required by integrator (t)
    end
    
    
    methods
-      function obj = PWLinearControl(tspan, nControlPts, nControls)
-         obj.tspan = tspan;
+      function obj = PWLinearControl(t, nControlPts, nControls)
          obj.nControlPts = nControlPts;
          obj.nControls = nControls;
-         obj.uspan = linspace(tspan(1), tspan(end), nControlPts);       
-         obj.dudv = obj.make_dudv();
+         obj.controlPts = linspace(t(1), t(end), nControlPts);
+         obj.B = obj.compute_basis_matrix(t);
       end
       
       
       function [Lb, Ub] = compute_nlp_bounds(obj, controlBounds)
-         % boundMatrix ~ nCONTROLS x 2
          
          Lb = controlBounds(:,1)*ones(1, obj.nControlPts);
          Lb = reshape(Lb, [], 1);
@@ -30,33 +28,37 @@ classdef PWLinearControl < ControlType
       end
       
       
-      function dudv = make_dudv(obj)
-         dudv = zeros(length(obj.tspan), length(obj.uspan));
+      function B = compute_basis_matrix(obj, t)
+         B = zeros(obj.nControlPts, length(t));
          
-         tent = griddedInterpolant([obj.uspan(1), obj.uspan(2)], [1, 0], ...
+         % Basis function at left end of time interval
+         tent = griddedInterpolant(obj.controlPts(1:2), [1, 0], ...
                                    'linear', 'nearest');
-         dudv(:,1) = tent(obj.tspan)';
+         B(1,:) = tent(t);
          
-         for i = 2:length(obj.uspan)-1
-            tent = griddedInterpolant(obj.uspan(i-1:i+1), [0, 1, 0], ...
+         % All basis functions in the interior
+         for i = 2:obj.nControlPts-1
+            tent = griddedInterpolant(obj.controlPts(i-1:i+1), [0, 1, 0], ...
                                       'linear', 'nearest');
-            dudv(:,i) = tent(obj.tspan)';
+            B(i,:) = tent(t);            
          end
          
-         tent = griddedInterpolant(obj.uspan(end-1:end), [0, 1], ...
+         % Basis function at right end of time interval          
+         tent = griddedInterpolant(obj.controlPts(end-1:end), [0, 1], ...
                                    'linear', 'nearest');
-         dudv(:,end) = tent(obj.tspan)';
+         B(end,:) = tent(t);
       end
       
       
       function dJdv = compute_dJdv(obj, dJdu)
-         dJdv = dJdu*obj.dudv;
+         dJdv = dJdu*obj.B';
+         dJdv = reshape(dJdv, [], 1);
       end
       
       
-      function u = compute_u(obj, t, v)
-         uFunc = obj.compute_uFunc(v);
-         u = uFunc(t);
+      function u = compute_u(obj, v)
+         v = reshape(v, obj.nControls, []);
+         u = v*obj.B;
       end
       
       
@@ -68,8 +70,8 @@ classdef PWLinearControl < ControlType
       
       
       function uFunc = compute_uFunc(obj, v)
-         uFunc  = vectorInterpolant(obj.uspan, ...
-                        reshape(v, obj.nControls, obj.nControlPts), 'linear');
+         v = reshape(v, obj.nControls, []);
+         uFunc  = vectorInterpolant(obj.controlPts, v, 'linear');
       end
 
    end

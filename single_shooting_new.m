@@ -14,6 +14,7 @@ else
    MinMax = 'Min';
 end
 
+% Parse varargin
 p = inputParser;
 p.addParamValue('TolX', 1e-6);
 p.addParamValue('TolFun', 1e-4);
@@ -26,13 +27,14 @@ p.addParamValue('IntegratorType', 'RK4', ...
                   @(x) any(strcmp(x, {'RK4', 'RK4Infinite'})));
 parse(p, varargin{:});
 
-% Turn control values into column vector for fmincon
 TolX = p.Results.TolX;
 TolFun = p.Results.TolFun;
 Algorithm = p.Results.Algorithm;
 DerivativeCheck = p.Results.DerivativeCheck;
 ControlType = p.Results.ControlType;
+IntegratorType = p.Results.IntegratorType;
 
+% Initialize integrator and control objects
 switch IntegratorType
    case 'RK4'
       integrator = RK4Integrator(tspan);
@@ -47,6 +49,7 @@ switch ControlType
       control = ChebyshevControl(integrator.t, nCONTROL_PTS, nCONTROLS);
 end
 
+% Setup plot function
 if p.Results.Reporting
    plotfun = @plot_func;
    iter_detail = 'iter-detailed';
@@ -93,7 +96,7 @@ end
 
 uOpt = control.compute_u(vOpt);
 xOpt = integrator.compute_states(prob, x0, uOpt);
-lamOpt = integrator.compute_adjoints(prob);
+lamOpt = integrator.compute_adjoints(prob, uOpt);
 
 soln.u = control.compute_uFunc(vOpt);
 soln.x = vectorInterpolant(tspan, xOpt, 'pchip');
@@ -107,7 +110,7 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
    function [J, dJdv] = nlpObjective(v)
       u = control.compute_u(v);
       [~, J] = integrator.compute_states(prob, x0, u);
-      [~, dJdu] = integrator.compute_adjoints(prob);    
+      [~, dJdu] = integrator.compute_adjoints(prob, u);    
       dJdv = control.compute_dJdv(dJdu);
    end
 
@@ -131,7 +134,7 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
             title(sprintf('Objective Value: %1.6e', objValue))
             set(gca, 'XLim', [T0 TF], 'YLim', ...
                [min(prob.ControlBounds(:,1)), max(prob.ControlBounds(:,2))]);
-            graphHandles = plot(tspan, u);
+            graphHandles = plot(integrator.t, u);
             set(graphHandles, 'Tag', 'handlesTag');
          else
             graphHandles = findobj(get(gca,'Children'),'Tag','handlesTag');
