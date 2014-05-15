@@ -16,7 +16,6 @@ T0 = tspan(1);
 TF = tspan(end);
 
 nCONTROLS = size(prob.ControlBounds, 1);
-CONTROL_SHAPE = [nCONTROLS, nCONTROL_PTS];
 
 if isfield(prob, 'MinMax')
    MinMax = prob.MinMax;
@@ -32,7 +31,6 @@ p.addParamValue('Reporting', true);
 p.addParamValue('DerivativeCheck', 'off');
 p.addParamValue('ControlType', 'linear', ...
                   @(x) any(strcmp(x, {'linear', 'Chebyshev'})));
-p.addParamValue('isInfiniteApprox', true);
 parse(p, varargin{:});
 
 % Turn control values into column vector for fmincon
@@ -41,7 +39,6 @@ TolFun = p.Results.TolFun;
 Algorithm = p.Results.Algorithm;
 DerivativeCheck = p.Results.DerivativeCheck;
 ControlType = p.Results.ControlType;
-isInfiniteApprox = p.Results.isInfiniteApprox;
 
 switch ControlType
    case 'linear'

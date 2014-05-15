@@ -1,0 +1,2 @@
+*  Change ControlType classes to fit new interface.
+*  
