@@ -32,23 +32,22 @@ TolX = p.Results.TolX;
 TolFun = p.Results.TolFun;
 Algorithm = p.Results.Algorithm;
 DerivativeCheck = p.Results.DerivativeCheck;
-ControlType = p.Results.ControlType;
-IntegratorType = p.Results.IntegratorType;
+
 
 % Initialize integrator and control objects
-switch IntegratorType
-   case 'RK4'
-      integrator = RK4Integrator(tspan);
-   case 'RK4Infinite'
-      integrator = RK4InfiniteIntegrator(tspan);
+if isempty(p.Results.Integrator)
+   integrator = RK4Integrator(tspan);
+else
+   integrator = p.Results.Integrator;
 end
 
-switch ControlType
-   case 'linear'
-      control = PWLinearControl(integrator.t, nCONTROL_PTS, nCONTROLS);
-   case 'Chebyshev'
-      control = ChebyshevControl(integrator.t, nCONTROL_PTS, nCONTROLS);
+
+if isempty(p.Results.Control)
+   control = PWLinearControl(integrator.t, nCONTROL_PTS, nCONTROLS);
+else
+   control = p.Results.Control;
 end
+
 
 % Setup plot function
 if p.Results.Reporting
