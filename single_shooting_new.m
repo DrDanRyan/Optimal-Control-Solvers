@@ -3,21 +3,6 @@ function soln = single_shooting_new(prob, x0, tspan, nCONTROL_PTS, varargin)
 % -----------------------------------
 % Initialize and setup options
 % -----------------------------------
-nSTATES = length(x0) + 1; % The last state is the objective integral
-nSTEPS = length(tspan) - 1;
-STATE_SHAPE = [nSTATES, nSTEPS+1];
-h = diff(tspan);
-
-% The integrator and control need to communicate about the shape of the "t"
-% vector describing the points where the control function is evaluated during
-% integration. The integrator should be initialized and then it should report
-% "t" to be used in the construction of the control object.
-
-% SHOULD BE DELEGATED TO THE INTEGRATOR
-% t = zeros(1, 2*nSTEPS+1); % a time vector that also includes the interval midpoints
-% t(1:2:end) = tspan;
-% t(2:2:end-1) = (tspan(1:end-1) + tspan(2:end))/2;
-
 T0 = tspan(1);
 TF = tspan(end);
 
@@ -141,22 +126,21 @@ soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
          objValue = optimValues.fval;
       end
       
-      switch state
-         case 'iter'
-            if optimValues.iteration == 0
-               title(sprintf('Objective Value: %1.6e', objValue))
-               set(gca, 'XLim', [T0 TF], 'YLim', ...
-                  [min(prob.ControlBounds(:,1)), max(prob.ControlBounds(:,2))]);
-               graphHandles = plot(tspan, u);
-               set(graphHandles, 'Tag', 'handlesTag');
-            else
-               graphHandles = findobj(get(gca,'Children'),'Tag','handlesTag');
-               graphHandles = graphHandles(end:-1:1); %Handle order gets reversed using findobj
-               title(sprintf('Objective Value: %1.6e', objValue));
-               for idx = 1:nCONTROLS
-                  set(graphHandles(idx), 'YData', u(idx, :));
-               end
+      if strcmp(state, 'iter')
+         if optimValues.iteration == 0
+            title(sprintf('Objective Value: %1.6e', objValue))
+            set(gca, 'XLim', [T0 TF], 'YLim', ...
+               [min(prob.ControlBounds(:,1)), max(prob.ControlBounds(:,2))]);
+            graphHandles = plot(tspan, u);
+            set(graphHandles, 'Tag', 'handlesTag');
+         else
+            graphHandles = findobj(get(gca,'Children'),'Tag','handlesTag');
+            graphHandles = graphHandles(end:-1:1); %Handle order gets reversed using findobj
+            title(sprintf('Objective Value: %1.6e', objValue));
+            for idx = 1:nCONTROLS
+               set(graphHandles(idx), 'YData', u(idx, :));
             end
+         end
       end
    end
 
