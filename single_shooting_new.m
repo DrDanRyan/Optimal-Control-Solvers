@@ -91,7 +91,6 @@ if strcmp(MinMax, 'Max')
   soln.J = -soln.J;
 end
 
-
 uOpt = control.compute_u(vOpt);
 xOpt = integrator.compute_states(prob, x0, uOpt);
 lamOpt = integrator.compute_adjoints(prob);
@@ -99,6 +98,7 @@ lamOpt = integrator.compute_adjoints(prob);
 soln.u = control.compute_uFunc(vOpt);
 soln.x = vectorInterpolant(tspan, xOpt, 'pchip');
 soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
+
 
 % -----------------------------------
 % Auxillary functions

@@ -1,2 +1,3 @@
 *  Change ControlType classes to fit new interface.
-*  
+*  Write and verify RK4Integrator
+*  Write and experiment with RK4InfiniteIntegrator
