@@ -8,6 +8,7 @@ classdef RK4Integrator < Integrator
       % Stores state values and intermediate state estimates computed during 
       % the last forward pass. These values are used to compute the adjoints.
       xK
+      
    end
    
    
@@ -51,15 +52,21 @@ classdef RK4Integrator < Integrator
          end         
 
          x = obj.xK(:,:,1);
-         J = x(end,end);
+         J = x(end,end); % maybe refactor this assumption into objective functional
       end
       
       
-      function [lam, dJdu] = compute_adjoints(obj, prob, u)
+      function [lam, dJdu] = compute_adjoints(obj, prob, u, lamT)
          
          nSTATES = size(obj.xK, 1);
-         lam = zeros(nSTATES, obj.nSTEPS+1);      
-         lam(end,end) = 1;
+         
+         if nargin < 4
+            lamT = zeros(nSTATES, 1);
+            lamT(end) = 1;
+         end        
+         
+         lam = nan(nSTATES, obj.nSTEPS+1);      
+         lam(:,end) = lamT;
          dJdk = nan(nSTATES, obj.nSTEPS, 4);
 
          for i = obj.nSTEPS:-1:1

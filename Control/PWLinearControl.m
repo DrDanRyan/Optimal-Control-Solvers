@@ -1,4 +1,4 @@
-classdef PWLinearControl < ControlType
+classdef PWLinearControl < Control
 
    properties
       nControlPts

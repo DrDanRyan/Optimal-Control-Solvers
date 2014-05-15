@@ -1,12 +1,11 @@
-classdef ChebyshevControl < ControlType
+classdef ChebyshevControl < Control
 
    properties
-      tspan
       nControlPts
       nControls     
-      uspan
-      dudv
-      boundMatrix
+      controlPts
+      
+      B
    end
    
    

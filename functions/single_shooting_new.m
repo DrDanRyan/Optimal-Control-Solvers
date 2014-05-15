@@ -14,6 +14,9 @@ else
    MinMax = 'Min';
 end
 
+
+
+
 % Parse varargin
 p = inputParser;
 p.addParamValue('TolX', 1e-6);
@@ -21,10 +24,8 @@ p.addParamValue('TolFun', 1e-4);
 p.addParamValue('Algorithm', 'sqp');
 p.addParamValue('Reporting', true);
 p.addParamValue('DerivativeCheck', 'off');
-p.addParamValue('ControlType', 'linear', ...
-                  @(x) any(strcmp(x, {'linear', 'Chebyshev'})));
-p.addParamValue('IntegratorType', 'RK4', ...
-                  @(x) any(strcmp(x, {'RK4', 'RK4Infinite'})));
+p.addParamValue('Control', []);
+p.addParamValue('Integrator', []);
 parse(p, varargin{:});
 
 TolX = p.Results.TolX;

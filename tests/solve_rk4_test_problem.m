@@ -13,4 +13,4 @@ prob = rk4_test_problem();  % all problem definitions are in the function make_t
 nControlPts = 101;
 
 %% Solve the problem
-soln = single_shooting_new(prob, x0, tspan, nControlPts)
+soln = single_shooting_new(prob, x0, tspan, nControlPts, 'IntegratorType', 'RK4Infinite')

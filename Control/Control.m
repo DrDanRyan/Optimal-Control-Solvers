@@ -1,5 +1,5 @@
-classdef ControlType < handle
-% This defines the interface required for a ControlType subclass
+classdef Control < handle
+% This defines the interface for a Control object
    
    methods (Abstract)
       dJdv = compute_dJdv(obj, dJdu)
