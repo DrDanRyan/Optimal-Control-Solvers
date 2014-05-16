@@ -26,6 +26,7 @@ p.addParamValue('Reporting', true);
 p.addParamValue('DerivativeCheck', 'off');
 p.addParamValue('Control', []);
 p.addParamValue('Integrator', []);
+p.addParamValue('u0', 0);
 parse(p, varargin{:});
 
 TolX = p.Results.TolX;
@@ -47,6 +48,10 @@ if isempty(p.Results.Control)
 else
    control = p.Results.Control;
 end
+
+
+% Initialize initial control values
+u0 = min(prob.ControlBounds(:,2), max(prob.ControlBounds(:,1), p.Results.u0));
 
 
 % Setup plot function
@@ -72,7 +77,7 @@ nlpOptions = optimoptions(@fmincon, 'Algorithm', Algorithm, ...
 % Main execution
 % -----------------------------------
 
-v0 = control.compute_initial_v(prob.ControlBounds);
+v0 = control.compute_initial_v(u0);
 
 if ismethod(control, 'compute_nlp_bounds')
    [Lb, Ub] = control.compute_nlp_bounds(prob.ControlBounds);

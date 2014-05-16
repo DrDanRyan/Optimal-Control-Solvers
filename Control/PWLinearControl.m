@@ -62,10 +62,8 @@ classdef PWLinearControl < Control
       end
       
       
-      function v = compute_initial_v(obj, boundMatrix)
-         % boundMatrix ~ nControls x 2
-         v = max(boundMatrix(:,1), 0);
-         v = repmat(v, obj.nControlPts, 1);
+      function v = compute_initial_v(obj, u0)
+         v = repmat(u0, obj.nControlPts, 1);
       end
       
       

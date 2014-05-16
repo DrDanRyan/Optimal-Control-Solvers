@@ -2,7 +2,7 @@
 close all
 clear all
 global c m r umax;
-T = 10;
+T = 5;
 nSteps = 1000;
 tspan = linspace(0, T, nSteps+1); 
 tspanExtra = linspace(T, 2*T, nSteps+1);
@@ -29,4 +29,5 @@ integrator = RK4InfiniteIntegrator(tspan, tspanExtra, uStar);
 
 %% Solve the problem
 soln = single_shooting_new(prob, x0, tspan, nControlPts, ...
-                           'Integrator', integrator)
+                           'Integrator', integrator, ...
+                           'u0', uStar);
