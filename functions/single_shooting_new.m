@@ -99,8 +99,8 @@ xOpt = integrator.compute_states(prob, x0, uOpt);
 lamOpt = integrator.compute_adjoints(prob, uOpt);
 
 soln.u = control.compute_uFunc(vOpt);
-soln.x = vectorInterpolant(tspan, xOpt, 'pchip');
-soln.lam = vectorInterpolant(tspan, lamOpt, 'pchip');
+soln.x = vectorInterpolant(tspan, xOpt(1:end-1,:), 'pchip');
+soln.lam = vectorInterpolant(tspan, lamOpt(1:end-1,:), 'pchip');
 
 
 % -----------------------------------

@@ -16,12 +16,11 @@ nControlPts = 101;
 
 
 %% Compute equilibrium solution 
-h = T/nSteps;
 xGuess = 2.7;
 lamGuess = 2.2;
 uGuess = .7;
 
-[~, ~, uStar] = compute_equilibrium(prob, xGuess, lamGuess, uGuess, r, h);
+[~, ~, uStar] = compute_equilibrium(prob, xGuess, lamGuess, uGuess, r);
 
 
 %% Build RK4InfiniteIntegrator
