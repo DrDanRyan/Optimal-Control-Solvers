@@ -12,19 +12,17 @@ prob.ControlBounds = [0 umax]; %lower bound in 1st column, upper bound in 2nd
                                %additional rows for more controls if needed
 
 
-   function value = F(t, y, u)
-      x = y(1,:);
+   function value = F(t, x, u)
       value = [x.*(m - x) - u;
                exp(-r*t).*(x.^2 + c*u.^2)];
    end
 
-   function value = dFdx_times_vec(t, y, u, v)
-      x = y(1,:);
+   function value = dFdx_times_vec(t, x, ~, v)
       value = [(m - 2*x).*v(1,:) + 2*exp(-r*t).*x.*v(2,:); 
                0];
    end
 
-   function value = dFdu_times_vec(t, y, u, v)
+   function value = dFdu_times_vec(t, ~, u, v)
       value = -v(1,:) + 2*c*exp(-r*t).*u.*v(2,:);
    end
 
