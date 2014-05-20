@@ -1,7 +1,7 @@
 classdef ChebyshevControl < Control
 
    properties
-      nControlPts
+      nControlBasis
       nControls     
       controlPts
       
@@ -10,69 +10,48 @@ classdef ChebyshevControl < Control
    
    
    methods
-      function obj = ChebyshevControl(tspan, nControlPts, nControls)
-         obj.tspan = tspan;
-         obj.nControlPts = nControlPts;
+      function obj = ChebyshevControl(t, nControlBasis, nControls)
+         obj.nControlBasis = nControlBasis;
          obj.nControls = nControls;
-         obj.uspan = linspace(tspan(1), tspan(end), nControlPts);       
-         obj.dudv = obj.make_dudv();
+         obj.controlPts = linspace(t(1), t(end), nControlBasis);
+         obj.B = obj.compute_basis_matrix(t);
       end
       
       
-      function [c, ceq] = compute_nonlcon(obj, v)
-         % boundMatrix ~ nCONTROLS x 2
+      function B = compute_basis_matrix(obj, t)
+         B = zeros(obj.nControlBasis, length(t));
+         tTrans = 2*(t - t(1))/(t(end) - t(1)) - 1; % tTrans in [-1, 1]
          
-         Lb = controlBounds(:,1)*ones(1, obj.nControlPts);
-         Lb = reshape(Lb, [], 1);
+         B(1,:) = 1;
+         B(2,:) = tTrans;
          
-         Ub = controlBounds(:,2)*ones(1, obj.nControlPts);
-         Ub = reshape(Ub, [], 1);
-      end
-      
-      
-      function dudv = make_dudv(obj)
-         dudv = zeros(length(obj.tspan), length(obj.uspan));
-         
-         tent = griddedInterpolant([obj.uspan(1), obj.uspan(2)], [1, 0], ...
-                                   'linear', 'nearest');
-         dudv(:,1) = tent(obj.tspan)';
-         
-         for i = 2:length(obj.uspan)-1
-            tent = griddedInterpolant(obj.uspan(i-1:i+1), [0, 1, 0], ...
-                                      'linear', 'nearest');
-            dudv(:,i) = tent(obj.tspan)';
+         for i = 3:obj.nControlBasis
+            B(i,:) = 2*tTrans.*B(i-1,:) - B(i-2,:);
          end
-         
-         tent = griddedInterpolant(obj.uspan(end-1:end), [0, 1], ...
-                                   'linear', 'nearest');
-         dudv(:,end) = tent(obj.tspan)';
       end
       
       
       function dJdv = compute_dJdv(obj, dJdu)
-         dJdv = dJdu*obj.dudv;
+         dJdv = dJdu*obj.B';
+         dJdv = reshape(dJdv, [], 1);
       end
       
       
-      function u = compute_u(obj, t, v)
-         uFunc = obj.compute_uFunc(v);
-         u = uFunc(t);
+      function u = compute_u(obj, v)
+         v = reshape(v, obj.nControls, []);
+         u = v*obj.B;
       end
       
       
-      function v = compute_initial_v(obj, boundMatrix)
-         % boundMatrix ~ nControls x 2
-         obj.boundMatrix = boundMatrix;
+      function v = compute_initial_v(obj, u0)
+         v = [u0; zeros((obj.nControlBasis-1)*obj.nControls, 1)];
+      end
+      
+      
+      function [A, b] = compute_lincon(obj, ControlBounds)
          
-         v = max(boundMatrix(:,1), 0);
-         v = repmat(v, obj.nControlPts, 1);
       end
-      
-      
-      function uFunc = compute_uFunc(obj, v)
-         uFunc  = vectorInterpolant(obj.uspan, ...
-                        reshape(v, obj.nControls, obj.nControlPts), 'linear');
-      end
+
 
    end
    

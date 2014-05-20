@@ -90,7 +90,15 @@ else
    nonlcon = [];
 end
 
-[vOpt, soln.J] = fmincon(@nlpObjective, v0, [], [], [], [], ...
+if ismethod(control, 'compute_lincon')
+   [A, b] = control.compute_lincon(prob.ControlBounds);
+else
+   A = [];
+   b = [];
+end
+
+
+[vOpt, soln.J] = fmincon(@nlpObjective, v0, A, b, [], [], ...
                            Lb, Ub, nonlcon, nlpOptions);
                         
 if strcmp(MinMax, 'Max')
