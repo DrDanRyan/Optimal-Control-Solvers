@@ -1,25 +1,36 @@
 %% Setup the problem
-global c m umax;
-T0 = 0;
-TF = 10;
-time = linspace(T0, TF, 1001); 
+close all
+clear all
+
+T = 5;
+nSteps = 1000;
+tspan = linspace(0, T, nSteps+1); 
+tspanExtra = linspace(T, 2*T, nSteps+1);
+
 x0 = 1;
-c = 1.5;
-m = 3;
-umax = 1;
-prob = make_test_problem();  % all problem definitions are in the function make_test_problem
 
-%% Forward/Backward Sweep with odevr7
-sweepSoln = fb_sweep(prob, x0, [T0, TF])
+p.c = 1.5;
+p.m = 3;
+p.r = .05;
+ControlBounds = [0, 1];
+prob = TestOCProblem(p, ControlBounds);
 
-%% Single Shooting 
-controlPtArray = linspace(T0, TF, 51);
-nlpSoln = single_shooting(prob, x0, controlPtArray)
+nControlPts = 101;
 
-%% Take nlpSoln as initial guess and solve using bvp5c
-options.u0 = nlpSoln.u;
-bvpSoln = bvp_solver(prob, x0, [T0, TF], options)
 
-%% Plot all three solution controls 
-plot(time, sweepSoln.u(time), time, nlpSoln.u(time), time, bvpSoln.u(time))
-legend('f/b sweep', 'single shooting', 'bvp solver')
+%% Compute equilibrium solution 
+xGuess = 2.7;
+lamGuess = 2.2;
+uGuess = .7;
+
+[~, ~, uStar] = compute_equilibrium(prob, xGuess, lamGuess, uGuess, p.r);
+
+
+%% Build RK4InfiniteIntegrator
+integrator = RK4InfiniteIntegrator(tspan, tspanExtra, uStar);
+
+
+%% Solve the problem
+soln = single_shooting_new(prob, x0, tspan, nControlPts, ...
+                           'Integrator', integrator, ...
+                           'u0', uStar);

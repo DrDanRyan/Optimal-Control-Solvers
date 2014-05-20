@@ -28,7 +28,8 @@ classdef TestOCProblem < OCProblem
       
       function value = dFdx_times_vec(obj, t, y, ~, v)
          x = y(1,:);
-         value = (obj.m - 2*x).*v(1,:) + 2*exp(-obj.r*t).*x.*v(2,:);
+         value = [(obj.m - 2*x).*v(1,:) + 2*exp(-obj.r*t).*x.*v(2,:)
+                  0];
       end
       
       
