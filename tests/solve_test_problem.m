@@ -2,8 +2,8 @@
 close all
 clear all
 
-T = 5;
-nSteps = 1000;
+T = 10;
+nSteps = 500;
 tspan = linspace(0, T, nSteps+1); 
 tspanExtra = linspace(T, 2*T, nSteps+1);
 
@@ -23,7 +23,10 @@ xGuess = 2.7;
 lamGuess = 2.2;
 uGuess = .7;
 
-[~, ~, uStar] = compute_equilibrium(prob, xGuess, lamGuess, uGuess, p.r);
+lb = [0; -Inf; ControlBounds(1)];
+ub = [Inf; Inf; ControlBounds(2)];
+[~, ~, uStar] = ...
+   compute_equilibrium(prob, xGuess, lamGuess, uGuess, lb, ub, p.r);
 
 
 %% Build RK4InfiniteIntegrator
@@ -32,5 +35,5 @@ integrator = RK4InfiniteIntegrator(tspan, tspanExtra, uStar);
 
 %% Solve the problem
 soln = single_shooting(prob, x0, tspan, nControlPts, ...
-                       'Integrator', integrator, ...
-                       'u0', uStar);
+                       'u0', uStar');%, ...
+                       %Integrator', integrator);

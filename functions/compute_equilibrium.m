@@ -1,5 +1,5 @@
-function [xStar, lamStar, uStar] = ...
-   compute_equilibrium(prob, xGuess, lamGuess, uGuess, r)
+function [xStar, lamStar, uStar, resnorm, residual, exitflag] = ...
+   compute_equilibrium(prob, xGuess, lamGuess, uGuess, lb, ub, r)
 
    nStates = length(xGuess); % does not include xJ state
    nControls = length(uGuess);
@@ -20,7 +20,11 @@ function [xStar, lamStar, uStar] = ...
       value(uIdx) = prob.dFdu_times_vec(0, x, u, [lam; 1]);
    end
 
-   yStar = fsolve(@equilibrium_system, [xGuess; lamGuess; uGuess]);
+   options = optimoptions('lsqnonlin','MaxFunEvals', 1000*(2*nStates + nControls), ...
+                                      'MaxIter', 4000, ...
+                                      'TolFun', 1e-10);
+   [yStar, resnorm, residual, exitflag] = ...
+      lsqnonlin(@equilibrium_system, [xGuess; lamGuess; uGuess], lb, ub, options);
    
    xStar = yStar(xIdx);
    lamStar = yStar(lamIdx);
