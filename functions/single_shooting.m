@@ -17,14 +17,14 @@ end
 
 % Parse varargin
 p = inputParser;
-p.addParamValue('TolX', 1e-5);
-p.addParamValue('TolFun', 3e-4);
-p.addParamValue('Algorithm', 'sqp');
-p.addParamValue('Reporting', true);
-p.addParamValue('DerivativeCheck', 'off');
-p.addParamValue('Control', []);
-p.addParamValue('Integrator', []);
-p.addParamValue('u0', 0);
+p.addParameter('TolX', 1e-5);
+p.addParameter('TolFun', 3e-4);
+p.addParameter('Algorithm', 'sqp');
+p.addParameter('Reporting', true);
+p.addParameter('DerivativeCheck', 'off');
+p.addParameter('Control', []);
+p.addParameter('Integrator', []);
+p.addParameter('u0', 0);
 parse(p, varargin{:});
 
 TolX = p.Results.TolX;
@@ -86,6 +86,7 @@ end
 
 if ismethod(control, 'compute_nonlcon')
    nonlcon = @control.compute_nonlcon;
+   nlpOptions.GradConstr = 'on';
 else
    nonlcon = [];
 end
