@@ -4,7 +4,7 @@ classdef Control < handle
    methods (Abstract)
       dJdv = compute_dJdv(obj, dJdu)
       u = compute_u(obj, t, v)
-      v = compute_initial_v(obj, controlBounds)
+      v = compute_initial_v(obj, u0)
       uFunc = compute_uFunc(v)
       
       % These are optional if nlp bound or nonlinear constraints are in effect
