@@ -19,10 +19,10 @@ classdef PWConstantControl < Control
       
       
       function [Lb, Ub] = compute_nlp_bounds(obj, controlBounds)
-         Lb = controlBounds(:,1)*ones(1, obj.nControlPts);
+         Lb = controlBounds(:,1)*ones(1, obj.nControlIntervals);
          Lb = reshape(Lb, [], 1);
 
-         Ub = controlBounds(:,2)*ones(1, obj.nControlPts);
+         Ub = controlBounds(:,2)*ones(1, obj.nControlIntervals);
          Ub = reshape(Ub, [], 1);
       end     
       
@@ -50,7 +50,7 @@ classdef PWConstantControl < Control
       
       
       function v = compute_initial_v(obj, u0)
-         v = repmat(u0, obj.nControlPts, 1);
+         v = repmat(u0, obj.nControlIntervals, 1);
       end
       
       
