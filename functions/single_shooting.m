@@ -8,7 +8,7 @@ TF = tspan(end);
 
 nCONTROLS = size(prob.ControlBounds, 1);
 
-if isfield(prob, 'MinMax')
+if isprop(prob, 'MinMax')
    MinMax = prob.MinMax;
 else
    MinMax = 'Min';
@@ -25,13 +25,17 @@ p.addParameter('DerivativeCheck', 'off');
 p.addParameter('Control', []);
 p.addParameter('Integrator', []);
 p.addParameter('u0', 0);
+p.addParameter('FreeInitStates', []); % vector of indices indicating which initial states are free to optimize
+p.addParameter('FreeStateBounds', []); % only used if FreeInitStates is non-empty
 parse(p, varargin{:});
 
 TolX = p.Results.TolX;
 TolFun = p.Results.TolFun;
 Algorithm = p.Results.Algorithm;
 DerivativeCheck = p.Results.DerivativeCheck;
-
+FreeInitStates = p.Results.FreeInitStates;
+nFREE_STATES = length(FreeInitStates);
+FreeStateBounds = p.Results.FreeStateBounds;
 
 % Initialize integrator and control objects
 if isempty(p.Results.Integrator)
@@ -75,10 +79,18 @@ nlpOptions = optimoptions(@fmincon, 'Algorithm', Algorithm, ...
 % Main execution
 % -----------------------------------
 
-v0 = control.compute_initial_v(u0);
+if (nFREE_STATES == 0)
+   v0 = control.compute_initial_v(u0);
+else
+   v0 = [control.compute_initial_v(u0); x0(FreeInitStates)];
+end
 
 if ismethod(control, 'compute_nlp_bounds')
    [Lb, Ub] = control.compute_nlp_bounds(prob.ControlBounds);
+   if (nFREE_STATES > 0)
+      Lb = [Lb; FreeStateBounds(:,1)];
+      Ub = [Ub; FreeStateBounds(:,2)];
+   end
 else
    Lb = [];
    Ub = [];
@@ -106,11 +118,14 @@ if strcmp(MinMax, 'Max')
   soln.J = -soln.J;
 end
 
-uOpt = control.compute_u(vOpt);
+uOpt = control.compute_u(vOpt(1:end-nFREE_STATES));
+if (nFREE_STATES > 0)
+   x0(FreeInitStates) = vOpt(end-nFREE_STATES+1:end);
+end
 xOpt = integrator.compute_states(prob, x0, uOpt);
 lamOpt = integrator.compute_adjoints(prob, uOpt);
 
-soln.u = control.compute_uFunc(vOpt);
+soln.u = control.compute_uFunc(vOpt(1:end-nFREE_STATES));
 soln.x = vectorInterpolant(tspan, xOpt(1:end-1,:), 'pchip');
 soln.lam = vectorInterpolant(tspan, lamOpt(1:end-1,:), 'pchip');
 
@@ -120,10 +135,18 @@ soln.lam = vectorInterpolant(tspan, lamOpt(1:end-1,:), 'pchip');
 % -----------------------------------
    
    function [J, dJdv] = nlpObjective(v)
-      u = control.compute_u(v);
-      [~, J] = integrator.compute_states(prob, x0, u);
-      [~, dJdu] = integrator.compute_adjoints(prob, u);    
-      dJdv = control.compute_dJdv(dJdu);
+      if (nFREE_STATES == 0)
+         u = control.compute_u(v);
+         [~, J] = integrator.compute_states(prob, x0, u);
+         [~, dJdu] = integrator.compute_adjoints(prob, u);    
+         dJdv = control.compute_dJdv(dJdu);
+      else 
+         u = control.compute_u(v(1:end-nFREE_STATES));
+         x0(FreeInitStates) = v(end-nFREE_STATES+1:end);
+         [~, J] = integrator.compute_states(prob, x0, u);
+         [lam, dJdu] = integrator.compute_adjoints(prob, u);
+         dJdv = [control.compute_dJdv(dJdu); lam(FreeInitStates,1)];
+      end
    end
 
 
@@ -134,7 +157,7 @@ soln.lam = vectorInterpolant(tspan, lamOpt(1:end-1,:), 'pchip');
       % without returning any information)
       
       stop = 0;
-      u = control.compute_u(v);
+      u = control.compute_u(v(1:end-nFREE_STATES));
       if strcmp(MinMax, 'Max')
          objValue = -optimValues.fval;
       else
