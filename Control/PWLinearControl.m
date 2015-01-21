@@ -63,7 +63,11 @@ classdef PWLinearControl < Control
       
       
       function v = compute_initial_v(obj, u0)
-         v = repmat(u0, obj.nControlPts, 1);
+         if length(u0) == 1
+            v = repmat(u0, obj.nControlPts, 1);
+         elseif length(u0) == obj.nControlPts
+            v = reshape(u0, [], 1);   
+         end
       end
       
       
